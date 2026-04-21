@@ -1,0 +1,8 @@
+.gocache/
+.gomodcache/
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+.data/
+mockinterview
+.tmp*.cover

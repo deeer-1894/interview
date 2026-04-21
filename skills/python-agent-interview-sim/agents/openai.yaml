@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Agent Interview Sim"
+  short_description: "模拟 Python Agent 开发岗位的技术面试、追问和评分反馈"
+  default_prompt: "Use $python-agent-interview-sim to run a realistic interview for Python-based agent development."
