@@ -8,12 +8,23 @@ cd "$SCRIPT_DIR"
 REDIS_ADDR="${REDIS_ADDR:-localhost:6379}"
 MONGO_URI="${MONGO_URI:-mongodb://localhost:27017}"
 MONGO_DATABASE="${MONGO_DATABASE:-mockinterview}"
-MODEL_PROVIDER="${MODEL_PROVIDER:-openai-compatible}"
-MODEL_NAME="${MODEL_NAME:-glm-4.6v}"
-MODEL_API_KEY="${MODEL_API_KEY:-${LLM_API_KEY:-6030658fa75b4499ae1937a52f9533e5.gOON1QaKhKggSiAR}}"
-MODEL_BASE_URL="${MODEL_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}"
+MODEL_PROVIDER="${MODEL_PROVIDER:-}"
+MODEL_NAME="${MODEL_NAME:-}"
+MODEL_API_KEY="${MODEL_API_KEY:-${LLM_API_KEY:-}}"
+MODEL_BASE_URL="${MODEL_BASE_URL:-}"
 MODEL_TIMEOUT_SECONDS="${MODEL_TIMEOUT_SECONDS:-180}"
 ADDR="${ADDR:-:8080}"
+
+missing_vars=()
+[[ -n "$MODEL_PROVIDER" ]] || missing_vars+=("MODEL_PROVIDER")
+[[ -n "$MODEL_NAME" ]] || missing_vars+=("MODEL_NAME")
+[[ -n "$MODEL_API_KEY" ]] || missing_vars+=("MODEL_API_KEY or LLM_API_KEY")
+[[ -n "$MODEL_BASE_URL" ]] || missing_vars+=("MODEL_BASE_URL")
+
+if [[ ${#missing_vars[@]} -gt 0 ]]; then
+  echo "缺少模型环境变量，拒绝启动: ${missing_vars[*]}" >&2
+  exit 1
+fi
 
 echo "启动 Mock Interview 服务器"
 echo "================================"
@@ -28,7 +39,7 @@ echo "  - Provider: $MODEL_PROVIDER"
 echo "  - Model: $MODEL_NAME"
 echo "  - Base URL: $MODEL_BASE_URL"
 echo "  - Timeout: ${MODEL_TIMEOUT_SECONDS}s"
-echo "  - API Key: 使用脚本默认值，可被环境变量覆盖"
+echo "  - API Key: 通过环境变量注入"
 echo ""
 DISPLAY_ADDR="${ADDR#:}"
 if [[ "$DISPLAY_ADDR" != :* ]]; then

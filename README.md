@@ -149,7 +149,7 @@ MODEL_BASE_URL=https://your-endpoint \
 go run ./cmd/mockinterview -serve -addr :8080
 ```
 
-项目里也提供了 [start.sh](/Users/shiyi/mockinterview/start.sh) 和 [start-glm.sh](/Users/shiyi/mockinterview/start-glm.sh)。这两个脚本现在只读取环境变量里的模型凭证，不再内置真实密钥。
+项目里也提供了 [start.sh](/Users/shiyi/mockinterview/start.sh) 和 [start-glm.sh](/Users/shiyi/mockinterview/start-glm.sh)。`start.sh` 在当前分支只从环境变量读取模型配置；`start-glm.sh` 提供了一个带 GLM 默认 provider/model/base URL 的便捷入口，但同样要求通过环境变量提供 API key。
 
 ### 2. 启动前端开发模式
 
