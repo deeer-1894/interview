@@ -1,104 +1,99 @@
-# Mock Interview Workspace
+# OfferBot Mock Interview
 
-一个基于 `CloudWeGo Eino ADK` 的模拟技术面试工作台。项目当前已经不是单次 `/chat` 问答 Demo，而是围绕 `Conversation -> Task -> Run` 组织的可恢复面试系统，包含流式执行、澄清中断、评分复盘、候选人画像、材料管理和技能驱动。
+OfferBot 是一个基于 Go、CloudWeGo Eino ADK 和 React 的 AI 模拟面试系统。当前版本聚焦一件事：围绕候选人简历和目标职位，生成更接近真实技术面的长流程追问，并通过 SSE 把模型输出实时推送到前端。
 
-## 当前能力
+## 当前状态
 
-- 会话式工作区
-  - 创建、置顶、归档、重命名、删除工作区
-  - 每个工作区聚合 `Task` 与 `Run`
-- 面试运行时
-  - 创建 run、流式输出、取消、恢复
-  - `waiting_clarify` 中断与 resume
-  - checkpoint 恢复优先，transcript 续跑兜底
-- 面试策略
-  - `standard`
-  - `stress`
-  - `weakness_focused`
-  - `system_design`
-  - `resume_deep_dive`
-- 复盘中心
-  - scorecard
-  - 决策审计
-  - 追问树
-  - phase view
-  - 候选人画像
-- 技能与材料
-  - 本地 `skills/` 技能库
-  - 技能创建、更新、上传
-  - 文本材料创建、上传、下载、更新、删除
-  - 材料默认按 task / run 绑定
-- 辅助能力
-  - 显式开关控制的联网检索
-  - `copilot` 提示接口
-  - SSE 事件流与 review snapshot 聚合查询
+- 后端：Go + Gin + Eino ADK
+- 前端：React + Vite + Tailwind + shadcn/ui 风格组件
+- 存储：MongoDB 持久化简历、会话、消息、评分；Redis 保存 checkpoint
+- 模型：通过 `MODEL_PROVIDER` / `MODEL_NAME` / `MODEL_API_KEY` / `MODEL_BASE_URL` 接入
+- 认证：当前开发账号固定为 `shiyi123@123.com` / `shiyi123456`
 
-## 架构总览
+## 核心能力
 
-```text
-web/src (React + Vite workbench)
-        │
-        ▼
-internal/web
-HTTP API + SSE + static hosting
-        │
-        ▼
-internal/control/service
-conversation / task / run lifecycle
-        │
-        ▼
-internal/control/runtime
-engine + run context + telemetry
-        │
-        ▼
-internal/control/middleware
-output -> setup -> checkpoint -> clarify -> skill -> memory
--> reduction -> artifact_binding -> planning -> adversarial
--> tool_routing -> summarization
-        │
-        ├─ internal/executors/interview
-        ├─ internal/interview
-        ├─ internal/tools
-        └─ internal/state + internal/storage/artifacts
-```
+- 简历驱动面试
+  - 保存候选人真实简历
+  - 创建不同职位、级别、模式的面试会话
+  - 面试问题基于当前会话上下文和简历内容生成
 
-## 目录
+- Eino ADK Runtime
+  - 使用 `ChatModelAgent` 承载模型调用
+  - 使用 middleware 做上下文注入、上下文隔离、工具安全、追问质量控制
+  - 支持 checkpoint、clarify interrupt、resume 这类长任务控制点
+
+- 流式对话
+  - `POST /api/sessions/stream` 创建会话并流式生成开场问题
+  - `POST /api/sessions/:id/messages/stream` 提交回答并流式生成下一轮追问
+  - 前端展示“正在思考 / 正在查看上下文 / 正在生成”状态
+  - 后端避免空 assistant 静默成功，前端也会对空输出给出可见提示
+
+- ChatGPT 风格前端
+  - 左侧会话列表、搜索弹层、删除会话
+  - 中央 Markdown 消息流
+  - 底部固定输入框
+  - 深浅色切换
+
+## 架构
 
 ```text
-cmd/mockinterview/                CLI 与 HTTP server 入口
-internal/control/                生命周期、运行时、中间件、workflow
-internal/executors/interview/    面试执行器、评分生成、流式输出
-internal/interview/              面试领域模型、prompt、信号、决策、skill pack
-internal/interview/adkapp/       Eino ADK 接线与模型工厂
-internal/protocol/               API / 事件 / review 共享协议
-internal/state/                  Mongo / Redis 适配与仓储
-internal/storage/artifacts/      附件文件存储
-internal/tools/                  gateway、registry、MCP HTTP transport
-internal/web/                    REST、SSE、前端静态托管
-scripts/                         smoke / UI smoke 脚本
-skills/                          项目内技能库
-web/                             React + Vite 前端
+web/
+  React + Vite UI
+  Markdown 渲染 / SSE 流式消费 / 会话搜索与管理
+
+cmd/mockinterview/
+  Gin HTTP API
+  登录、简历、会话、消息、评分接口
+
+internal/interview/runtime/
+  Eino ADK Runtime
+  model factory
+  middleware
+  graph tools
+  clarify tool
+
+internal/interview/session/
+  面试会话与消息模型
+
+internal/interview/resume/
+  简历模型
+
+internal/interview/report/
+  评分结果模型
+
+internal/state/mongo/
+  MongoDB store
+
+internal/state/redis/
+  Redis checkpoint store
 ```
 
-## 依赖
+## 目录说明
 
-- Go：使用 [go.mod](/Users/shiyi/mockinterview/go.mod) 中声明的版本
-- Node.js：用于前端开发与测试
-- Redis：checkpoint、clarify、短期运行态
-- MongoDB：conversation、task、run、message、event、profile、artifact metadata
+```text
+cmd/mockinterview/                 后端入口与 HTTP API
+docs/eino-runtime-notes.md         Eino / Eino ADK 设计笔记
+internal/interview/runtime/        Agent Runtime、middleware、工具与模型工厂
+internal/interview/resume/         简历领域模型
+internal/interview/session/        面试会话、消息与状态模型
+internal/interview/report/         面试评分模型
+internal/interview/store/          存储接口
+internal/state/memory/             内存存储实现
+internal/state/mongo/              MongoDB 存储实现
+internal/state/redis/              Redis checkpoint 实现
+web/                               React 前端
+```
 
 ## 环境变量
 
-### 持久化层
+### 存储
 
-- `REDIS_ADDR`
+- `MONGO_URI`，默认 `mongodb://localhost:27017`
+- `MONGO_DATABASE`，默认 `mockinterview`
+- `REDIS_ADDR`，默认 `localhost:6379`
 - `REDIS_PASSWORD`
-- `REDIS_PREFIX`
-- `MONGO_URI`
-- `MONGO_DATABASE`
-- `ARTIFACT_STORAGE_DIR`
 
-### 模型配置
+### 模型
 
 - `MODEL_PROVIDER`
 - `MODEL_NAME`
@@ -106,80 +101,73 @@ web/                             React + Vite 前端
 - `MODEL_BASE_URL`
 - `MODEL_TIMEOUT_SECONDS`
 
-同时兼容部分 provider 专属变量，例如：
-
-- `OPENAI_API_KEY`
-- `CLAUDE_API_KEY` / `ANTHROPIC_API_KEY`
-- `GEMINI_API_KEY`
-- `DEEPSEEK_API_KEY`
-- `OLLAMA_BASE_URL`
-- `QWEN_API_KEY`
-- `OPENAI_BY_AZURE`
-- `CLAUDE_BY_BEDROCK`
-- `CLAUDE_BY_VERTEX`
-
-支持的 provider：
-
-- `openai`
-- `openai-compatible`
-- `claude`
-- `gemini`
-- `deepseek`
-- `ollama`
-- `qwen`
-
-### 调试
-
-- `STREAM_DEBUG=true`
+当前后端会从环境变量创建 Eino ChatModel。推荐使用 openai-compatible provider 接入兼容 OpenAI Chat Completions 的模型服务。
 
 ## 启动
 
-### 1. 启动后端
-
-先准备 Redis、Mongo 和模型环境变量，然后运行：
+### 后端
 
 ```bash
-REDIS_ADDR=localhost:6379 \
-MONGO_URI=mongodb://localhost:27017 \
-MONGO_DATABASE=mockinterview \
 MODEL_PROVIDER=openai-compatible \
 MODEL_NAME=your-model \
 MODEL_API_KEY=your-api-key \
-MODEL_BASE_URL=https://your-endpoint \
+MODEL_BASE_URL=https://your-model-endpoint \
+MONGO_URI=mongodb://localhost:27017 \
+MONGO_DATABASE=mockinterview \
+REDIS_ADDR=localhost:6379 \
 go run ./cmd/mockinterview -serve -addr :8080
 ```
 
-项目里也提供了 [start.sh](/Users/shiyi/mockinterview/start.sh) 和 [start-glm.sh](/Users/shiyi/mockinterview/start-glm.sh)。`start.sh` 在当前分支只从环境变量读取模型配置；`start-glm.sh` 提供了一个带 GLM 默认 provider/model/base URL 的便捷入口，但同样要求通过环境变量提供 API key。
+本地也可以使用项目内启动脚本，但脚本里的本机配置不作为通用部署约定。
 
-### 2. 启动前端开发模式
+### 前端
 
 ```bash
-cd /Users/shiyi/mockinterview/web
+cd web
 npm install
 npm run dev
 ```
 
-### 3. 构建前端
+默认访问：
 
-```bash
-cd /Users/shiyi/mockinterview/web
-npm run build
-```
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8080`
 
-构建后的 `web/dist` 会由 Go 服务直接托管。
+## API
 
-### 4. CLI 单轮运行
+### 认证
 
-不加 `-serve` 时可以直接从命令行跑一轮面试：
+- `POST /api/login`
 
-```bash
-go run ./cmd/mockinterview \
-  -skill go-agent-interview-sim \
-  -mode standard \
-  -prompt "请模拟一场 Go agent 开发岗位的技术面试。"
-```
+### 简历
 
-## 测试
+- `GET /api/profile`
+- `POST /api/profile`
+
+### 技能
+
+- `GET /api/skills`
+
+### 会话
+
+- `GET /api/sessions`
+- `POST /api/sessions`
+- `POST /api/sessions/stream`
+- `DELETE /api/sessions/:id`
+
+### 消息
+
+- `GET /api/sessions/:id/messages`
+- `POST /api/sessions/:id/messages`
+- `POST /api/sessions/:id/messages/stream`
+- `GET /api/sessions/:id/stream`
+
+### Resume 与评分
+
+- `POST /api/sessions/:id/resume`
+- `GET /api/sessions/:id/report`
+
+## 开发验证
 
 ### 后端
 
@@ -187,100 +175,17 @@ go run ./cmd/mockinterview \
 go test ./...
 ```
 
-### 接口级 smoke
-
-后端启动后：
-
-```bash
-bash /Users/shiyi/mockinterview/scripts/smoke_test.sh
-```
-
-脚本覆盖：
-
-- `health / profile / skills`
-- conversation 生命周期
-- files 创建、上传、读取、更新、删除
-- task / run / review / events
-- cancel / resume
-- 兼容接口 `POST /api/interview`
-
 ### 前端
 
 ```bash
-cd /Users/shiyi/mockinterview/web
-npm run test:components
-npm run test:e2e
+cd web
+npm run build
 ```
 
-### 页面级 UI smoke
+## 设计原则
 
-```bash
-bash /Users/shiyi/mockinterview/scripts/ui_smoke_test.sh
-```
-
-更多手工验收项见 [MANUAL_ACCEPTANCE_CHECKLIST.md](/Users/shiyi/mockinterview/MANUAL_ACCEPTANCE_CHECKLIST.md)。
-
-## 核心 API
-
-### 会话与任务
-
-- `GET /api/conversations`
-- `POST /api/conversations`
-- `GET /api/conversations/:id`
-- `PATCH /api/conversations/:id`
-- `DELETE /api/conversations/:id`
-- `POST /api/tasks`
-
-### 运行
-
-- `POST /api/runs`
-- `GET /api/runs/:id`
-- `POST /api/runs/:id/resume`
-- `POST /api/runs/:id/cancel`
-- `POST /api/runs/:id/copilot`
-- `GET /api/runs/:id/review`
-- `GET /api/runs/:id/events`
-
-### 技能与材料
-
-- `GET /api/skills`
-- `POST /api/skills`
-- `GET /api/skills/:name`
-- `PUT /api/skills/:name`
-- `GET /api/files?conversationId=...`
-- `POST /api/files`
-- `GET /api/files/:id`
-- `GET /api/files/:id?content=1`
-- `GET /api/files/:id?download=1`
-- `PUT /api/files/:id`
-- `DELETE /api/files/:id`
-
-### 其他
-
-- `GET /api/health`
-- `GET /api/profile`
-- `POST /api/interview`
-
-`POST /api/interview` 目前仍保留兼容路径，但主流程应优先使用 `Conversation / Task / Run` API。
-
-## 前端工作台
-
-`web/src/app.tsx` 当前承载以下主路径：
-
-- 左侧工作区列表与状态排序
-- 中央消息画布与 Markdown 流式渲染
-- 启动 run 弹层
-- 会话配置弹层
-- 会话内联评分 / 阶段 / 画像摘要
-- copilot hint 面板
-
-会话内联结果主入口位于：
-
-- [web/src/app.tsx](/Users/shiyi/mockinterview/web/src/app.tsx)
-- [web/src/components/session/session-context-modal.tsx](/Users/shiyi/mockinterview/web/src/components/session/session-context-modal.tsx)
-
-## 相关文档
-
-- [ARCHITECTURE_EXECUTION_STANDARD.md](/Users/shiyi/mockinterview/ARCHITECTURE_EXECUTION_STANDARD.md)：当前架构边界与执行标准
-- [MANUAL_ACCEPTANCE_CHECKLIST.md](/Users/shiyi/mockinterview/MANUAL_ACCEPTANCE_CHECKLIST.md)：手工验收清单
-- [MANUAL_ACCEPTANCE_RESULT.md](/Users/shiyi/mockinterview/MANUAL_ACCEPTANCE_RESULT.md)：最近一次手工验收结果
+- 不把具体简历内容写死进提示词或策略代码。
+- Skill / middleware 只描述通用面试能力、质量控制和上下文边界。
+- 真实问题生成交给模型，工程侧负责上下文、约束、状态和输出质量。
+- 空模型输出必须显式失败或可见提示，不能静默成功。
+- 简历、职位、会话历史必须按 session 隔离，避免不同职位或项目之间互相污染。

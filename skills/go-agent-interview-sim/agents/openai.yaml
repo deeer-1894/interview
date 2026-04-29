@@ -1,4 +1,0 @@
-interface:
-  display_name: "Go Agent Interview Sim"
-  short_description: "模拟 Go Agent 开发岗位的技术面试、追问和评分反馈"
-  default_prompt: "Use $go-agent-interview-sim to run a realistic interview for Go-based agent development."
